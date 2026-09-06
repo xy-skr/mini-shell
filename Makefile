@@ -26,8 +26,7 @@ $(BUILD_DIR):
 run: $(BIN)
 	./$(BIN)
 
-debug: CFLAGS += -g3 -O0 -fsanitize=address,undefined
-debug: LDFLAGS += -fsanitize=address,undefined
+debug: CFLAGS += -g3 -O0
 debug: clean all
 
 clean:

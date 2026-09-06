@@ -16,7 +16,7 @@ contributing member of the open source community.
 | Version | Status | Description |
 |---------|--------|-------------|
 | v0      | done   | REPL, fork/exec/wait, `exit` builtin |
-| v1      | todo   | Builtins: `cd`, `exit`, `echo`, environment variables |
+| v1      | done   | Builtins (`cd`, `exit`, `echo`, `pwd`), `$VAR` expansion (`$?`, `$$`) |
 | v2      | todo   | Pipes (`\|`) and redirections (`>`, `<`) |
 | v3      | todo   | Signal handling, robust error reporting |
 | v4      | todo   | History, line editing, job control |
