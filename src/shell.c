@@ -39,10 +39,32 @@ static int run_command(char *const argv[])
     int status = 0;
     waitpid(pid, &status, 0);
     if (WIFEXITED(status)) {
-        printf("[exit %d]\n", WEXITSTATUS(status));
+        if (WEXITSTATUS(status)) printf("[exit %d]\n", WEXITSTATUS(status));
         return WEXITSTATUS(status);
     }
     return -1;
+}
+
+static int builtin_cd(int argc, char *const argv[])
+{
+    const char *dir;
+
+    if (argc >= 2)  dir = argv[1];
+    else dir = getenv("HOME");
+
+    if (dir == NULL || *dir == '\0')
+    {
+        fprintf(stderr, "minish: cd: HOME not set\n");
+        return 1;
+    }
+
+    if (chdir(dir))
+    {
+        fprintf(stderr, "minish: cd: %s: %s\n", dir, strerror(errno));
+        return 1;
+    }
+
+    return 0;
 }
 
 int shell_loop(void)
@@ -74,6 +96,12 @@ int shell_loop(void)
         if (argc == 0) continue;
 
         if (strcmp(argv[0], "exit") == 0 || strcmp(argv[0], "quit") == 0) break;
+
+        if (strcmp(argv[0], "cd") == 0)
+        {
+            builtin_cd(argc, argv);
+            continue;
+        }
 
         run_command(argv);
     }
