@@ -14,6 +14,7 @@
 
 typedef struct redir_s {
     int syntax_err;
+    const char *infile;
     const char *outfile;
 }   redir_t;
 
@@ -40,19 +41,30 @@ static int parse_line(char *line, char **argv, int max_args, redir_t *redir)
             }
             else
             {
-                redir->syntax_err = 0;
                 redir->outfile = argv[i+1];
                 argv[i] = NULL;
             }
-
-            break;
+        }
+        else if (strcmp(argv[i], "<") == 0)
+        {
+            if(i == 0 || argv[i+1] == NULL)
+            {
+                redir->syntax_err = 1;
+                redir->infile = NULL;
+                fprintf(stderr, "minish: syntax error near '<'\n");
+            }
+            else
+            {
+                redir->infile = argv[i+1];
+                argv[i] = NULL;
+            }
         }
     }
 
     return argc;
 }
 
-static int run_command(char *const argv[], const char *outfile)
+static int run_command(char *const argv[], const char *infile, const char *outfile)
 {
     pid_t pid = fork();
     if (pid < 0) {
@@ -60,6 +72,17 @@ static int run_command(char *const argv[], const char *outfile)
         return -1;
     }
     if (pid == 0) {
+        if (infile)
+        {
+            int fd = open(infile, O_RDONLY);
+            if (fd < 0)
+            {
+                fprintf(stderr, "minish: %s: %s\n", infile, strerror(errno));
+                _exit(1);
+            }
+            dup2(fd, STDIN_FILENO);
+            close(fd);
+        }
         if (outfile)
         {
             int fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -149,7 +172,7 @@ int shell_loop(void)
             continue;
         }
 
-        if (!redir.syntax_err) run_command(argv, redir.outfile);
+        if (!redir.syntax_err) run_command(argv, redir.infile, redir.outfile);
     }
 
     return 0;
