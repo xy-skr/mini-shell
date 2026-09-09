@@ -7,11 +7,17 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #define MAX_LINE 4096
 #define MAX_ARGS 256
 
-static int parse_line(char *line, char **argv, int max_args)
+typedef struct redir_s {
+    int syntax_err;
+    const char *outfile;
+}   redir_t;
+
+static int parse_line(char *line, char **argv, int max_args, redir_t *redir)
 {
     int argc = 0;
     char *save = NULL;
@@ -21,10 +27,32 @@ static int parse_line(char *line, char **argv, int max_args)
         tok = strtok_r(NULL, " \t", &save);
     }
     argv[argc] = NULL;
+
+    for (int i = 0; i < argc; i++)
+    {
+        if (strcmp(argv[i], ">") == 0)
+        {
+            if(i == 0 || argv[i+1] == NULL)
+            {
+                redir->syntax_err = 1;
+                redir->outfile = NULL;
+                fprintf(stderr, "minish: syntax error near '>'\n");
+            }
+            else
+            {
+                redir->syntax_err = 0;
+                redir->outfile = argv[i+1];
+                argv[i] = NULL;
+            }
+
+            break;
+        }
+    }
+
     return argc;
 }
 
-static int run_command(char *const argv[])
+static int run_command(char *const argv[], const char *outfile)
 {
     pid_t pid = fork();
     if (pid < 0) {
@@ -32,16 +60,30 @@ static int run_command(char *const argv[])
         return -1;
     }
     if (pid == 0) {
+        if (outfile)
+        {
+            int fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd < 0)
+            {
+                fprintf(stderr, "minish: %s: %s\n", outfile, strerror(errno));
+                _exit(1);
+            }
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+        }
+
         execvp(argv[0], argv);
         fprintf(stderr, "minish: %s: %s\n", argv[0], strerror(errno));
         _exit(127);
     }
+
     int status = 0;
     waitpid(pid, &status, 0);
     if (WIFEXITED(status)) {
         if (WEXITSTATUS(status)) printf("[exit %d]\n", WEXITSTATUS(status));
         return WEXITSTATUS(status);
     }
+
     return -1;
 }
 
@@ -92,7 +134,11 @@ int shell_loop(void)
         line[strcspn(line, "\n")] = '\0';
         line[strcspn(line, "\r")] = '\0';
 
-        int argc = parse_line(line, argv, MAX_ARGS);
+        redir_t redir = {
+            .syntax_err = 0,
+            .outfile = NULL
+        };
+        int argc = parse_line(line, argv, MAX_ARGS, &redir);
         if (argc == 0) continue;
 
         if (strcmp(argv[0], "exit") == 0 || strcmp(argv[0], "quit") == 0) break;
@@ -103,7 +149,8 @@ int shell_loop(void)
             continue;
         }
 
-        run_command(argv);
+        if (!redir.syntax_err) run_command(argv, redir.outfile);
     }
+
     return 0;
 }
